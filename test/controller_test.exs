@@ -24,6 +24,11 @@ defmodule BlueBird.Test.ControllerTest do
 
     apigroup "Bobtails", "The Bobtail Resource"
 
+    api_shared :my_parameters do
+      note "Shared note"
+      parameter :topic, :string
+    end
+
     api :GET, "/users" do
       group "Users"
       title "List all users"
@@ -34,6 +39,7 @@ defmodule BlueBird.Test.ControllerTest do
 
     api :POST, "/users" do
       group "Users"
+      parameter_object :my_parameters
     end
 
     api :DELETE, "/users/:id" do end
@@ -45,7 +51,7 @@ defmodule BlueBird.Test.ControllerTest do
     api :PATCH, "/users/:id/:pid/:topic" do
       parameter :id, :integer, [description: "the user ID"]
       parameter :pid, :integer, [description: "the post ID"]
-      parameter :topic, :string
+      parameter_object :my_parameters
     end
   end
 
@@ -93,7 +99,7 @@ defmodule BlueBird.Test.ControllerTest do
     test "extracts all parameters" do
       path = "/users/:id/:pid/:topic"
 
-      assert Controller.api_doc("PATCH", path).parameters == [
+      assert Controller.api_doc("PATCH", path).parameters |> Enum.sort == [
         %Parameter{
           description: "the user ID",
           name: "id",
@@ -109,7 +115,14 @@ defmodule BlueBird.Test.ControllerTest do
           name: "topic",
           type: "string"
         }
-    ]
+    ] |> Enum.sort
+    end
+
+    test "all documentation macros can be shared" do
+      path_one = "/users/:id/:pid/:topic"
+      path_two = "/users"
+      assert Controller.api_doc("PATCH", path_one).note == "Shared note"
+      assert Controller.api_doc("POST", path_two).note == "Shared note"
     end
 
     test "raises error if single value fields have too many values" do

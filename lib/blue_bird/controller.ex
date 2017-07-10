@@ -40,7 +40,7 @@ defmodule BlueBird.Controller do
   defmacro __using__(_) do
     quote do
       import BlueBird.Controller, only: [
-        api: 3, apigroup: 1, apigroup: 2, api_parameters: 2]
+        api: 3, apigroup: 1, apigroup: 2, api_shared: 2]
     end
   end
 
@@ -76,29 +76,30 @@ defmodule BlueBird.Controller do
         ]
   """
   defmacro api(method, path, do: block) do
-    method_str    = method_to_string(method)
-    metadata      = extract_metadata(block)
-    title         = extract_option(metadata, :title)
-    description   = extract_option(metadata, :description)
-    note          = extract_option(metadata, :note)
-    warning       = extract_option(metadata, :warning)
-    parameters    = extract_parameters(metadata)
-    parameter_objects = extract_parameter_objects(metadata)
+    method_str = method_to_string(method)
+    metadata = extract_metadata(block)
+    all_fields = extract_all_fields(metadata)
+    shared_metadata  = extract_shared_objects(metadata)
 
     quote do
       @spec api_doc(String.t, String.t) :: Route.t
       def api_doc(unquote(method_str), unquote(path)) do
-        param_objects = unquote(parameter_objects)
-        |> Enum.concat()
+        shared =
+          unquote(shared_metadata)
+          |> Enum.at(0, %{})
+          |> Enum.filter(fn {_, v} -> v end)
+          |> Enum.into(%{})
 
-        params = unquote(Macro.escape(parameters)) ++ param_objects
+        all = unquote(Macro.escape(all_fields))
+        params = Map.get(shared, :parameters, []) ++ Map.get(all, :parameters, [])
+        combined = Map.merge(all, shared)
 
         %Route{
-          title:        unquote(title),
-          description:  unquote(description),
-          note:         unquote(note),
+          title:        combined.title,
+          description:  combined.description,
+          note:         combined.note,
           method:       unquote(method_str),
-          warning:      unquote(warning),
+          warning:      combined.warning,
           path:         unquote(path),
           parameters:   params
         }
@@ -137,18 +138,30 @@ defmodule BlueBird.Controller do
     end
   end
 
-  defmacro api_parameters(id, do: block) do
-    metadata      = extract_metadata(block)
-    parameters    = extract_parameters(metadata)
+  defmacro api_shared(id, do: block) do
+    metadata =
+      block
+      |> extract_metadata
+      |> extract_all_fields
 
     quote do
       def api_parameter_object(unquote(id)) do
-        unquote(Macro.escape(parameters))
+        unquote(Macro.escape(metadata))
       end
     end
   end
 
-  defp extract_parameter_objects(metadata) do
+  defp extract_all_fields(metadata) do
+    %{
+      title: extract_option(metadata, :title),
+      description: extract_option(metadata, :description),
+      note: extract_option(metadata, :note),
+      warning: extract_option(metadata, :warning),
+      parameters: extract_parameters(metadata)
+    }
+  end
+
+  defp extract_shared_objects(metadata) do
     metadata
     |> Keyword.get_values(:parameter_object)
     |> Enum.concat()

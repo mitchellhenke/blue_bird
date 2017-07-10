@@ -22,7 +22,7 @@ defmodule BlueBird.Test.Support.TestController do
     warning "Warning"
   end
 
-  api_parameters :my_parameters do
+  api_shared :my_parameters do
     parameter :page, :number
     parameter :limit, :number, [default: 100]
     parameter :order_by, :string
