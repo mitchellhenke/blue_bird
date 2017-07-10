@@ -163,7 +163,7 @@ defmodule BlueBird.Controller do
 
   defp extract_shared_objects(metadata) do
     metadata
-    |> Keyword.get_values(:parameter_object)
+    |> Keyword.get_values(:shared_fields)
     |> Enum.concat()
     |> Enum.map(fn(p) -> quote do api_parameter_object(unquote(p)) end end)
   end

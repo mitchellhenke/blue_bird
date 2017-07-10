@@ -39,7 +39,7 @@ defmodule BlueBird.Test.ControllerTest do
 
     api :POST, "/users" do
       group "Users"
-      parameter_object :my_parameters
+      shared_fields :my_parameters
     end
 
     api :DELETE, "/users/:id" do end
@@ -51,7 +51,7 @@ defmodule BlueBird.Test.ControllerTest do
     api :PATCH, "/users/:id/:pid/:topic" do
       parameter :id, :integer, [description: "the user ID"]
       parameter :pid, :integer, [description: "the post ID"]
-      parameter_object :my_parameters
+      shared_fields :my_parameters
     end
   end
 
