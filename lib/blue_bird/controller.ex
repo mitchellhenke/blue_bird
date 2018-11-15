@@ -39,7 +39,8 @@ defmodule BlueBird.Controller do
 
   defmacro __using__(_) do
     quote do
-      import BlueBird.Controller, only: [api: 3, apigroup: 1, apigroup: 2]
+      import BlueBird.Controller, only: [api: 3, apigroup: 1, apigroup: 2, parameters: 1, notes: 1,
+                                         warnings: 1]
     end
   end
 
@@ -76,7 +77,9 @@ defmodule BlueBird.Controller do
   """
   defmacro api(method, path, do: block) do
     method_str    = method_to_string(method)
-    metadata      = extract_metadata(block)
+    metadata      = block
+                    |> extract_metadata
+                    |> extract_shared_params
     title         = extract_option(metadata, :title)
     description   = extract_option(metadata, :description)
     note          = extract_option(metadata, :note)
@@ -98,6 +101,19 @@ defmodule BlueBird.Controller do
       end
     end
   end
+
+  defp extract_shared_params(metadata) do
+    metadata
+    |> Enum.map(&eval_shared_param/1)
+  end
+
+  defp eval_shared_param({:shared_item, value}) do
+    value
+    |> Code.eval_quoted
+    |> elem(0)
+    |> List.first()
+  end
+  defp eval_shared_param(value), do: value
 
   @doc """
   Defines the name and an optional description for a resource group.
@@ -126,6 +142,67 @@ defmodule BlueBird.Controller do
           name: unquote(name),
           description: unquote(description)
         }
+      end
+    end
+  end
+
+  @doc """
+  Defines a list of parameters that can be used via the `shared_item` macro.
+
+  Each item in the list is the exact same as what would normally be passed directly to the
+  `parameter` key inside of an `api` macro.
+
+  ## Example
+
+      parameters [
+        [:some_param, :string, [description: "Neato param"]]
+      ]
+  """
+  defmacro parameters(params) do
+    for param <- params do
+      [name | spread] = param
+
+      quote do
+        def parameter(unquote(name), arg_name), do: {:parameter, [arg_name | unquote(spread)]}
+        def parameter(unquote(name)), do: {:parameter, unquote(param)}
+      end
+    end
+  end
+
+  @doc """
+  Defines a list of notes that can be used via the `shared_item` macro.
+
+  ## Example
+
+      notes [
+        [:authenticated, "Authentication required"]
+      ]
+  """
+  defmacro notes(notes) do
+    for note <- notes do
+      [name | spread] = note
+
+      quote do
+        def note(unquote(name)), do: {:note, unquote(spread)}
+      end
+    end
+  end
+
+  @doc """
+  Defines a list of warnings that can be used via the `shared_item` macro.
+
+  ## Example
+
+      notes [
+        [:destructive, "This will permanently destroy everything"]
+      ]
+  """
+  defmacro warnings(warnings) do
+    for warning <- warnings do
+      [name | spread] = warning
+
+      quote do
+        def warning(unquote(name)), do: {:warning, unquote(spread)}
       end
     end
   end
@@ -172,15 +249,15 @@ defmodule BlueBird.Controller do
   defp param_to_map([name, type, options]) when is_list(options) do
     Map.merge(
       %Parameter{
-        name: to_string(name),
+        name: name |> to_string |> wrap_in_backticks,
         type: to_string(type)
       },
-      Enum.into(options, %{})
+      options |> wrap_param_options |> Enum.into(%{})
     )
   end
   defp param_to_map([name, type]) do
     %Parameter{
-      name: to_string(name),
+      name: name |> to_string |> wrap_in_backticks,
       type: to_string(type)
     }
   end
@@ -203,4 +280,14 @@ defmodule BlueBird.Controller do
                                        optional: true]
           """
   end
+
+  defp wrap_param_options(options) do
+    options
+    |> Enum.map(&_wrap_param_options/1)
+  end
+  defp _wrap_param_options({:members, values}) when is_list(values), do: {:members, values |> Enum.map(&wrap_in_backticks/1)}
+  defp _wrap_param_options({key, value}) when key in [:default, :example], do: {key, wrap_in_backticks(value)}
+  defp _wrap_param_options(v), do: v
+  defp wrap_in_backticks(v) when is_list(v), do: v |> Enum.map(&wrap_in_backticks/1)
+  defp wrap_in_backticks(v), do: "`#{v}`"
 end

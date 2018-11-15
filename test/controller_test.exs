@@ -19,6 +19,22 @@ defmodule BlueBird.Test.ControllerTest do
   @parameter_type_error "The parameter macro expects a keyword list as " <>
                         "third argument."
 
+  defmodule Docs do
+    use BlueBird.Controller
+
+    parameters [
+      [:topic, :string, []]
+    ]
+
+    notes [
+      [:no_customers, "Please don't use this route if you are a customer."]
+    ]
+
+    warnings [
+      [:could_be_bad, "Could be really bad"]
+    ]
+  end
+
   defmodule Controller do
     use BlueBird.Controller
 
@@ -28,7 +44,7 @@ defmodule BlueBird.Test.ControllerTest do
       group "Users"
       title "List all users"
       description "This route returns a list of all users."
-      note "Please don't use this route if you are a customer."
+      shared_item BlueBird.Test.ControllerTest.Docs.note(:no_customers)
       warning "May have undocumented side effects."
     end
 
@@ -45,7 +61,8 @@ defmodule BlueBird.Test.ControllerTest do
     api :PATCH, "/users/:id/:pid/:topic" do
       parameter :id, :integer, [description: "the user ID"]
       parameter :pid, :integer, [description: "the post ID"]
-      parameter :topic, :string
+      shared_item BlueBird.Test.ControllerTest.Docs.parameter(:topic)
+      shared_item BlueBird.Test.ControllerTest.Docs.warning(:could_be_bad)
     end
   end
 
@@ -83,9 +100,9 @@ defmodule BlueBird.Test.ControllerTest do
       assert Controller.api_doc("PUT", "/users/:id").parameters == [
         %Parameter{
           description: nil,
-          name: "id",
+          name: "`id`",
           type: "integer",
-          default: "brownie",
+          default: "`brownie`",
           optional: true
         }
       ]
@@ -96,21 +113,27 @@ defmodule BlueBird.Test.ControllerTest do
       assert Controller.api_doc("PATCH", path).parameters == [
         %Parameter{
           description: "the user ID",
-          name: "id",
+          name: "`id`",
           type: "integer"
         },
         %Parameter{
           description: "the post ID",
-          name: "pid",
+          name: "`pid`",
           type: "integer"
         },
         %Parameter{
           description: nil,
-          name: "topic",
+          name: "`topic`",
           type: "string"
         }
     ]
-    end
+  end
+
+  test "extracts shared warnings" do
+    path = "/users/:id/:pid/:topic"
+
+    assert Controller.api_doc("PATCH", path).warning === "Could be really bad"
+  end
 
     test "raises error if single value fields have too many values" do
       message = "Expected single value for title, got 2"
