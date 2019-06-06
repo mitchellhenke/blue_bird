@@ -83,6 +83,10 @@ defmodule BlueBird.ConnLogger do
 
   ## Callbacks
 
+  def init(init_arg) do
+    {:ok, init_arg}
+  end
+
   @doc false
   def handle_call(:get_conns, _from, conns), do: {:reply, conns, conns}
 
