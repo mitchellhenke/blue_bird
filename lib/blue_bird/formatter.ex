@@ -13,7 +13,7 @@ defmodule BlueBird.Formatter do
       BlueBird.start()
       ExUnit.start(formatters: [ExUnit.CLIFormatter, BlueBird.Formatter])
   """
-  use GenEvent
+  use GenServer
 
   alias BlueBird.Writer.Blueprint
   alias BlueBird.Generator
@@ -28,11 +28,12 @@ defmodule BlueBird.Formatter do
   Event listener that triggers the generation of the api blueprint file on when
   receiving a `:suite_finished` message by `ExUnit`.
   """
-  @spec handle_event(event :: term, state :: term) ::
-    {:ok, nil} | :remove_handler
-  def handle_event({:suite_finished, _run_us, _load_us}, nil) do
+  @spec handle_cast(request :: term, state :: term) ::
+    {:noreply, nil}
+  def handle_cast({:suite_finished, _run_us, _load_us}, _state) do
     Generator.run() |> Blueprint.run()
-    :remove_handler
+    {:noreply, nil}
   end
-  def handle_event(_event, nil), do: {:ok, nil}
+
+  def handle_cast(_, _), do: {:noreply, nil}
 end
